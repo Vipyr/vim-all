@@ -1,0 +1,69 @@
+vim-all-cmd plugin
+===============================================================================
+
+Authors: Garrett Drapala
+         Bryan Brady
+
+
+Overview
+---------------------
+
+This plug-in is the result of a long search to replicate ve's "all"
+command in vim.
+
+
+What is provided
+------------------------
+
+The plug-in provides two global commands:
+
+    :All <pattern>
+    :EAll <pattern>
+
+(The only difference between All and EAll is that All uses grep to filter lines
+while EAll uses egrep.  Therefore, for patterns with complex regular
+expression, use EAll instead of All.)
+
+And the following functions, which are commonly called through a map (see
+examples).
+
+    GetSeqNum()    Extracts sequence number from current line
+    GetCmdAdr()    Extracts Address from current line
+    GetField(num)  Returns *num* white-space delimited field on current line
+
+
+Advantages relative to ve
+----------------------------------------------------
+
+    0. access to full vim/gvim functionality :)
+    1. multiple "all" windows may be open at the same time (without manually
+    renaming)
+    2. search buffers are named after the search pattern
+    3. search buffers are scratch buffers
+
+
+Similarities to ve
+----------------------------------------------------
+
+    1. search buffers have the same syntax highlighting applied
+    2. Ctrl-Q is mapped to jump back and forth between original file and the
+    last all search buffer.
+
+
+Examples
+------------------------
+
+
+    "-------------------------------------------------------------------------------
+    " Mappings for vim-all-cmd plugin
+    "-------------------------------------------------------------------------------
+
+    nnoremap <silent> <Leader>f :call NewAllCmd(input("Search for: "), "egrep -ni")<CR>
+    " filter for last search term
+    nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep -ni")<CR>
+    " filter for sequence the cursor is on.
+    nnoremap <silent> <Leader>s :call NewAllCmd(GetSeqNum(), "egrep -nwi")<CR>
+    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetSeqNum()), "egrep -ni")<CR>
+    nnoremap <silent> <Leader>a :call NewAllCmd(GetCmdAdr(), "grep -ni")<CR>
+
+
