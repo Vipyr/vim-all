@@ -19,40 +19,33 @@ endif
 command! -nargs=+ All :call NewAllCmd("<args>", "grep")
 command! -nargs=+ EAll :call NewAllCmd("<args>", "egrep")
 
+" Make searches case-insensitive by default (without a way to disable it)
+let g:all_filter_default_grep_opts="-i"
+
 "-------------------------------------------------------------------------------
 " Default Mappings
 "-------------------------------------------------------------------------------
 if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_mappings == 1)
-    nnoremap <silent> <Leader>f :call NewAllCmd(input("Search for: "), "egrep -ni")<CR>
+    nnoremap <silent> <Leader>f :call NewAllCmd(input("Search for: "), "egrep")<CR>
     " filter for last search term
-    nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep -ni")<CR>
+    nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep")<CR>
     " filter for sequence the cursor is on.
-    nnoremap <silent> <Leader>s :call NewAllCmd(GetSeqNum(), "egrep -nwi")<CR>
-    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetSeqNum()), "egrep -ni")<CR>
-    nnoremap <silent> <Leader>a :call NewAllCmd(GetCmdAdr(), "grep -ni")<CR>
+    nnoremap <silent> <Leader>s :call NewAllCmd(GetKey("seq="), "egrep")<CR>
+    nnoremap <silent> <Leader>p :call NewAllCmd(GetKey("Pseq=")[1:], "egrep")<CR>
+    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetKey("seq=")), "egrep")<CR>
+    nnoremap <silent> <Leader>a :call NewAllCmd(GetKey("Adr=")[4:15], "grep")<CR>
 endif
 
-function! GetSeqNum()
+function! GetKey(key)
 python <<PYTHON
 import vim
+key = vim.eval("a:key")
 toks = vim.current.line.split()
-seq = [x for x in toks if x.startswith("seq=")]
+seq = [x for x in toks if x.startswith(key)]
 if seq:
-    vim.command("return '%s '"%seq[0])
+    vim.command(r"return '%s\b'"%seq[0])
 else:
-    vim.command("return 'seq=unknown'")
-PYTHON
-endfunction
-
-function! GetCmdAdr()
-python <<PYTHON
-import vim
-toks = vim.current.line.split()
-adr = [x[4:15] for x in toks if x.startswith("Adr=")]
-if adr:
-    vim.command("return '%s'"%adr[0])
-else:
-    vim.command("return 'Adr=unknown'")
+    vim.command(r"return '%s not found on current line'" % key)
 PYTHON
 endfunction
 
@@ -101,41 +94,50 @@ endfunction
 
 function! NewAllCmd(search, grep_cmd)
 python <<PYTHON
-import vim
+import vim, re
 search = vim.eval("a:search")
 grep_cmd = vim.eval("a:grep_cmd")
-fname = vim.eval("bufname('')")
-ftype = vim.eval("&filetype")
-bnum = vim.current.buffer.number
-# save current buffer to tempfile
-tempname = vim.eval("tempname()")
-vim.command("silent w "+tempname)
-# create map to jump to the buffer of the last all view
-vim.command('map <buffer> <C-q> :exec "buffer" g:last_all_buf\|exec "normal j"<cr>')
-# new unnamed buffer
-vim.command("enew")
-# make it a scratch buffer
-vim.command("set buftype=nofile bufhidden=hide noswapfile")
-# read grep/grin output into empty buffer
-vim.command("silent r ! %s %r %s"%(grep_cmd, search, tempname))
-# hack to check if any lines found by cursor position
-row, col = vim.current.window.cursor
-if (row, col) == (1, 0):
-    vim.command("bd")
-    print "Pattern %r not found!" % search
+all_options = vim.eval("g:all_filter_default_grep_opts")
+# check that a buffer with the intended name doesn't already exist
+title = search.replace("|", "\|").replace(r'\b', '')
+title = title.replace("\"", "\\\"").replace(" ", "\ ")
+exists = any(title == b.name.rpartition("/")[2] if b.name else False for b in vim.buffers)
+if exists:
+    vim.command("echo %r" % ("buffer with name %r already exists!" % title))
 else:
-    vim.command("let g:last_all_buf=%s"%vim.current.buffer.number)
-    # set filetype
-    vim.command("setf "+ftype)
-    # change name of buffer to search pattern
-    search = vim.eval("escape(%r,%r)"%(search,"|"))
-    vim.command("file "+"".join(search.split()))
-    # hack to make buffer show up in minibufexplorer
-    vim.command("new")
-    vim.command("bd")
-    # hack to delete first line (blank), go to bottom, and bottom align
-    vim.command("normal ggddGzb")
-    vim.command('map <buffer> <C-q> :let @z=GetField(1)\|b %s\|exec "normal ".getreg("z")."Gzz"<CR>'%bnum)
+    fname = vim.eval("bufname('')")
+    ftype = vim.eval("&filetype")
+    bnum = vim.current.buffer.number
+    # save current buffer to tempfile
+    tempname = vim.eval("tempname()")
+    vim.command("silent w "+tempname)
+    # create map to jump to the buffer of the last all view
+    vim.command('map <buffer> <C-q> :exec "buffer" g:last_all_buf\|exec "normal j"<cr>')
+    # new unnamed buffer
+    vim.command("enew")
+    # make it a scratch buffer
+    vim.command("set buftype=nofile bufhidden=hide noswapfile")
+    # read grep/grin output into empty buffer
+    vim.command("silent r ! %s -n %s %s %s" %
+                (grep_cmd, all_options, re.escape(search), tempname))
+    # hack to check if any lines found by cursor position
+    row, col = vim.current.window.cursor
+    if (row, col) == (1, 0):
+        vim.command("bd")
+        vim.command("echo %r" % ("Pattern %r not found!" % search))
+    else:
+        vim.command("let g:last_all_buf=%s"%vim.current.buffer.number)
+        # set filetype
+        vim.command("setf "+ftype)
+        # change name of buffer to search pattern
+        vim.command("file "+title)
+        # hack to make buffer show up in minibufexplorer
+        vim.command("new")
+        vim.command("bd")
+        # hack to delete first line (blank), go to bottom, and bottom align
+        vim.command("normal ggddGzb")
+        # create map to jump to original buffer
+        vim.command('map <buffer> <C-q> :let @z=GetField(1)\|b %s\|exec "normal ".getreg("z")."Gzz"<CR>'%bnum)
 PYTHON
 endfunction
 
