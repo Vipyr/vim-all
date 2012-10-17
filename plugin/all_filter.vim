@@ -30,8 +30,8 @@ if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_map
     " filter for last search term
     nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep")<CR>
     " filter for sequence the cursor is on.
-    nnoremap <silent> <Leader>s :call NewAllCmd(GetKey("seq="), "egrep")<CR>
-    nnoremap <silent> <Leader>p :call NewAllCmd(GetKey("Pseq=")[1:], "egrep")<CR>
+    nnoremap <silent> <Leader>s :call NewAllCmd(GetKey("seq=")."\\b", "egrep")<CR>
+    nnoremap <silent> <Leader>p :call NewAllCmd(GetKey("Pseq=")[1:]."\\b", "egrep")<CR>
     nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetKey("seq=")), "egrep")<CR>
     nnoremap <silent> <Leader>a :call NewAllCmd(GetKey("Adr=")[4:15], "grep")<CR>
 endif
@@ -43,7 +43,7 @@ key = vim.eval("a:key")
 toks = vim.current.line.split()
 seq = [x for x in toks if x.startswith(key)]
 if seq:
-    vim.command(r"return '%s\b'"%seq[0])
+    vim.command(r"return '%s'"%seq[0])
 else:
     vim.command(r"return '%s not found on current line'" % key)
 PYTHON
@@ -54,28 +54,20 @@ python <<PYTHON
 import vim
 import re
 import sys
-def uniqify(seq):
-  seen = {}
-  ret = []
-  for s in seq:
-    if s not in seen:
-      ret.append(s)
-    seen[s] = 1 
-  return ret
 search = vim.eval("a:search")
 trace = vim.current.buffer[:]
 # Find all lines containing search string
 seq = [t for t in trace if t.find(search) > 0]
 # Find all addresses used by seqNum
 allAdrs = [a[4:15] for a in " ".join(seq).split() if a.startswith("Adr=")]
-allAdrs = uniqify(map(lambda x: x.strip(), allAdrs))
+allAdrs = sorted(set(map(lambda x: x.strip(), allAdrs)))
 # Find all the sequences operating on all addresses in adr
 reAdrs = re.compile("|".join(allAdrs), re.IGNORECASE)
 adrMatches = [t for t in trace if reAdrs.search(t) != None]
 # Stick a space on the end of each sequence number
 reSeqNum = re.compile(r"seq=[0-9]+", re.IGNORECASE)
 allSeqs = map(lambda x: x+" ", reSeqNum.findall(" ".join(adrMatches)))
-radness="ERROR|" + "|".join(uniqify(allSeqs))
+radness="ERROR|" + "|".join(sorted(set(allSeqs)))
 if radness:
   vim.command("return '%s'"%radness)
 else:
@@ -94,7 +86,7 @@ endfunction
 
 function! NewAllCmd(search, grep_cmd)
 python <<PYTHON
-import vim, re
+import vim, re, os
 search = vim.eval("a:search")
 grep_cmd = vim.eval("a:grep_cmd")
 all_options = vim.eval("g:all_filter_default_grep_opts")
@@ -138,6 +130,8 @@ else:
         vim.command("normal ggddGzb")
         # create map to jump to original buffer
         vim.command('map <buffer> <C-q> :let @z=GetField(1)\|b %s\|exec "normal ".getreg("z")."Gzz"<CR>'%bnum)
+if os.path.isfile(tempname):
+    os.remove(tempname)
 PYTHON
 endfunction
 
