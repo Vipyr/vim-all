@@ -1,6 +1,36 @@
+" all_filter.vim - A plug-in to filter lines of a buffer into a new search
+" buffer
+"
+" Optional flags:
+"     g:use_default_all_filter_mappings = 1 or 0
+"
+
+if !has('python')
+    " exit if python is not available.
+    finish
+endif
+
+if exists("b:did_all_filter_plugin")
+    finish " only load once
+else
+    let b:did_all_filter_plugin = 1
+endif
 
 command! -nargs=+ All :call NewAllCmd("<args>", "grep")
 command! -nargs=+ EAll :call NewAllCmd("<args>", "egrep")
+
+"-------------------------------------------------------------------------------
+" Default Mappings
+"-------------------------------------------------------------------------------
+if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_mappings == 1)
+    nnoremap <silent> <Leader>f :call NewAllCmd(input("Search for: "), "egrep -ni")<CR>
+    " filter for last search term
+    nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep -ni")<CR>
+    " filter for sequence the cursor is on.
+    nnoremap <silent> <Leader>s :call NewAllCmd(GetSeqNum(), "egrep -nwi")<CR>
+    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetSeqNum()), "egrep -ni")<CR>
+    nnoremap <silent> <Leader>a :call NewAllCmd(GetCmdAdr(), "grep -ni")<CR>
+endif
 
 function! GetSeqNum()
 python <<PYTHON
