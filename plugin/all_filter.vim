@@ -66,8 +66,9 @@ reAdrs = re.compile("|".join(allAdrs), re.IGNORECASE)
 adrMatches = [t for t in trace if reAdrs.search(t) != None]
 # Stick a space on the end of each sequence number
 reSeqNum = re.compile(r"seq=[0-9]+", re.IGNORECASE)
-allSeqs = map(lambda x: x+" ", reSeqNum.findall(" ".join(adrMatches)))
-radness="ERROR|" + "|".join(sorted(set(allSeqs)))
+allSeqs = map(lambda x: x.replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
+#radness="ERROR|" + "|".join(sorted(set(allSeqs)))
+radness="ERROR|seq=(" + "|".join(sorted(set(allSeqs))) + ")"
 if radness:
   vim.command("return '%s'"%radness)
 else:
