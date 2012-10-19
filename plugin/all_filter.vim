@@ -26,13 +26,23 @@ let g:all_filter_default_grep_opts="-i"
 " Default Mappings
 "-------------------------------------------------------------------------------
 if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_mappings == 1)
+    " Interactive filter
     nnoremap <silent> <Leader>f :call NewAllCmd(input("Search for: "), "egrep")<CR>
-    " filter for last search term
+    " Last search term filter
     nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep")<CR>
-    " filter for sequence the cursor is on.
+    " Sequence filter: extract sequence from current line and show related
+    " events
     nnoremap <silent> <Leader>s :call NewAllCmd(GetKey("seq=")."\\b", "egrep")<CR>
+    " Parent sequence filter: extract parent sequence from current line, then
+    " show all parent and child events
     nnoremap <silent> <Leader>p :call NewAllCmd(GetKey("Pseq=")[1:]."\\b", "egrep")<CR>
+    " Pipe pass filter: show pipe passes for the same chip/slice/pipe
+    nnoremap <silent> <Leader>fp :call NewAllCmd(GetFields(2,4," "), "egrep")<CR>
+    " Super filter: extracts address from current line and shows all sequences
+    " operating on the same address, plus any errors
     nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetKey("seq=")), "egrep")<CR>
+    " Address filter: extracts address from current line and shows all events
+    " with the same address
     nnoremap <silent> <Leader>a :call NewAllCmd(GetKey("Adr=")[4:15], "grep")<CR>
 endif
 
@@ -45,8 +55,19 @@ seq = [x for x in toks if x.startswith(key)]
 if seq:
     vim.command(r"return '%s'"%seq[0])
 else:
-    vim.command(r"return '%s not found on current line'" % key)
+    vim.command(r"throw '%s not found on current line'" % key)
 PYTHON
+endfunction
+
+function! GetFields(start, stop, delim)
+    " Return fields [start:stop] of the current line, split on *delim*
+    let toks = split(getline('.'), a:delim)
+    let start = a:start
+    let stop = a:stop
+    if len(toks) >= stop
+        return join(toks[start : stop], a:delim)
+    endif
+    throw "Number of tokens on line less than the range requested"
 endfunction
 
 function! GetEverything(search)
@@ -76,18 +97,10 @@ else:
 PYTHON
 endfunction
 
-function! GetField(num)
-    " return *num*-th whitespace-delimited field on the current line
-    let toks = split(getline('.'), ':')
-    if len(toks) >= a:num
-        return toks[a:num-1]
-    endif
-    return ''
-endfunction
-
 function! NewAllCmd(search, grep_cmd)
 python <<PYTHON
 import vim, re, os
+original_row, original_col = vim.current.window.cursor
 search = vim.eval("a:search")
 grep_cmd = vim.eval("a:grep_cmd")
 all_options = vim.eval("g:all_filter_default_grep_opts")
@@ -127,10 +140,15 @@ else:
         # hack to make buffer show up in minibufexplorer
         vim.command("new")
         vim.command("bd")
-        # hack to delete first line (blank), go to bottom, and bottom align
-        vim.command("normal ggddGzb")
+        # hack to delete first line (blank)
+        vim.command("normal ggdd")
+        # jump to line in search buffer associated with line the search was
+        # triggered from
+        vim.command("exec search('^%d:')" % original_row)
+        # center the current line
+        vim.command("normal zz")
         # create map to jump to original buffer
-        vim.command('map <buffer> <C-q> :let @z=GetField(1)\|b %s\|exec "normal ".getreg("z")."Gzz"<CR>'%bnum)
+        vim.command('map <buffer> <C-q> :let @z=GetFields(0,0,":")\|b %s\|exec "normal ".getreg("z")."Gzz"<CR>'%bnum)
 if os.path.isfile(tempname):
     os.remove(tempname)
 PYTHON
