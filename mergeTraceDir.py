@@ -47,7 +47,7 @@ def merge( traceFile, dirFile ):
 #===============================================================================
 desc = "Merge dir file into trace file"
 post = "Specifying a trace file or dir file take precedence over a filestem"
-parser = argparse.ArgumentParser(description=desc)
+parser = argparse.ArgumentParser(description=desc,epilog=post)
 
 parser.add_argument("filestem", default="", help="Name of filestem")
 parser.add_argument("-t", dest="traceFileName", default="", metavar="T", help="Name of trace file")
