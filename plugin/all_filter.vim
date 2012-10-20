@@ -21,6 +21,8 @@ command! -nargs=+ EAll :call NewAllCmd("<args>", "egrep")
 
 " Make searches case-insensitive by default (without a way to disable it)
 let g:all_filter_default_grep_opts="-i"
+" Allow short title for GetEverything buffer
+let g:all_filter_everything_short_title=0
 
 "-------------------------------------------------------------------------------
 " Default Mappings
@@ -32,7 +34,7 @@ if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_map
     " filter for sequence the cursor is on.
     nnoremap <silent> <Leader>s :call NewAllCmd(GetKey("seq=")."\\b", "egrep")<CR>
     nnoremap <silent> <Leader>p :call NewAllCmd(GetKey("Pseq=")[1:]."\\b", "egrep")<CR>
-    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetKey("seq=")), "egrep")<CR>
+    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetKey("seq=")), "egrep", GetKey("seq="))<CR>
     nnoremap <silent> <Leader>a :call NewAllCmd(GetKey("Adr=")[4:15], "grep")<CR>
 endif
 
@@ -66,7 +68,7 @@ reAdrs = re.compile("|".join(allAdrs), re.IGNORECASE)
 adrMatches = [t for t in trace if reAdrs.search(t) != None]
 # Stick a space on the end of each sequence number
 reSeqNum = re.compile(r"seq=[0-9]+", re.IGNORECASE)
-allSeqs = map(lambda x: x.replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
+allSeqs = map(lambda x: x.lower().replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
 #radness="ERROR|" + "|".join(sorted(set(allSeqs)))
 radness="ERROR|seq=(" + "|".join(sorted(set(allSeqs))) + ")"
 if radness:
@@ -85,15 +87,19 @@ function! GetField(num)
     return ''
 endfunction
 
-function! NewAllCmd(search, grep_cmd)
+function! NewAllCmd(search, grep_cmd, ...)
 python <<PYTHON
 import vim, re, os
 search = vim.eval("a:search")
 grep_cmd = vim.eval("a:grep_cmd")
+short_title = vim.eval('a:0 >= 1 ? a:1 : "" ')
+allow_short_title = int(vim.eval("g:all_filter_everything_short_title"))
 all_options = vim.eval("g:all_filter_default_grep_opts")
 # check that a buffer with the intended name doesn't already exist
 title = search.replace("|", "\|").replace(r'\b', '')
 title = title.replace("\"", "\\\"").replace(" ", "\ ")
+if allow_short_title != 0:
+    title = title if short_title == "" else "Everything:"+short_title
 exists = any(title == b.name.rpartition("/")[2] if b.name else False for b in vim.buffers)
 if exists:
     vim.command("echo %r" % ("buffer with name %r already exists!" % title))
