@@ -21,12 +21,15 @@ def merge( traceFile, dirFile ):
 
   # Create map of cycle -> list of lines in dir file with that cycle (order preserving)
   cycDirPairs = [ (dirCyc(d),d) for d in dirstate ]
-  cycDirMap = {cyc:[] for cyc in set([cdp[0] for cdp in cycDirPairs])}
+  # python 2.6 doesn't comprehend dict comprehension 
+  #cycDirMap = {cyc:[] for cyc in set([cdp[0] for cdp in cycDirPairs])}
+  cycDirMap = dict((cyc,[]) for cyc in set([cdp[0] for cdp in cycDirPairs]))
   for (c,d) in cycDirPairs:
     cycDirMap[c].append(d)
 
     reCycNum = re.compile("(Cyc) ([0-9]+)")
 
+  cycs = sorted(cycDirMap.keys())
   last_trace_cycle = -1
   for t in trace:
       
@@ -35,10 +38,19 @@ def merge( traceFile, dirFile ):
     
     # If we're at the end of a cycle in trace file, add dir file info
     if curr_trace_cycle != last_trace_cycle:
-      if last_trace_cycle in cycDirMap:
-        for d in cycDirMap[last_trace_cycle]:
-          print d
-            
+      i = 0
+      while i < len(cycs):
+        k = cycs[i]
+        if last_trace_cycle <= k and k < curr_trace_cycle:
+          for d in cycDirMap[k]:
+            print d
+          # deleting them makes it faster
+          cycs = cycs[1:]
+          del cycDirMap[k]
+        elif curr_trace_cycle <= k:
+          break
+        i += 1
+              
     print t
     last_trace_cycle = curr_trace_cycle
 
