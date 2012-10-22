@@ -12,12 +12,14 @@ endif
 
 if exists("b:did_all_filter_plugin")
     finish " only load once
-else
-    let b:did_all_filter_plugin = 1
 endif
 
-command! -nargs=+ All :call NewAllCmd("<args>", "grep")
-command! -nargs=+ EAll :call NewAllCmd("<args>", "egrep")
+let b:did_all_filter_plugin = 1
+
+command! -nargs=+ All    :call NewAllBuffer("<args>", "grep")
+command! -nargs=+ AllAdd :call NewAllBuffer("<args>", "grep", 'a')
+command! -nargs=+ EAll    :call NewAllBuffer("<args>", "egrep")
+command! -nargs=+ EAllAdd :call NewAllBuffer("<args>", "egrep", 'a')
 
 " Make searches case-insensitive by default (without a way to disable it)
 let g:all_filter_default_grep_opts="-i"
@@ -26,25 +28,55 @@ let g:all_filter_default_grep_opts="-i"
 " Default Mappings
 "-------------------------------------------------------------------------------
 if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_mappings == 1)
-    " Interactive filter
-    nnoremap <silent> <Leader>f :call NewAllCmd(input("Search for: "), "egrep")<CR>
     " Last search term filter
-    nnoremap <silent> <Leader>F :call NewAllCmd(@/, "grep")<CR>
+    nnoremap <silent> <Leader>al  :exec "All" @/<CR>
+    nnoremap <silent> <Leader>aal :exec "AllAdd" @/<CR>
     " Sequence filter: extract sequence from current line and show related
     " events
-    nnoremap <silent> <Leader>s :call NewAllCmd(GetKey("seq=")."\\b", "egrep")<CR>
-    " Parent sequence filter: extract parent sequence from current line, then
-    " show all parent and child events
-    nnoremap <silent> <Leader>p :call NewAllCmd(GetKey("Pseq=")[1:]."\\b", "egrep")<CR>
-    " Pipe pass filter: show pipe passes for the same chip/slice/pipe
-    nnoremap <silent> <Leader>fp :call NewAllCmd(GetFields(2,4," "), "egrep")<CR>
+    nnoremap <silent> <Leader>as  :exec "EAll" GetKey("seq=")."\\\\b"<CR>
+    nnoremap <silent> <Leader>aas :exec "EAllAdd" GetKey("seq=")."\\\\b"<CR>
     " Super filter: extracts address from current line and shows all sequences
     " operating on the same address, plus any errors
-    nnoremap <silent> <Leader>S :call NewAllCmd(GetEverything(GetKey("seq=")), "egrep")<CR>
+    nnoremap <silent> <Leader>aS  :exec "EAll" GetEverything(GetKey("seq="))<CR>
+    nnoremap <silent> <Leader>aaS :exec "EAllAdd" GetEverything(GetKey("seq="))<CR>
+    " Parent sequence filter: extract parent sequence from current line, then
+    " show all parent and child events
+    nnoremap <silent> <Leader>ap  :exec "EAll" GetKey("Pseq=")[1:]."\\\\b"<CR>
+    nnoremap <silent> <Leader>aap :exec "EAllAdd" GetKey("Pseq=")[1:]."\\\\b"<CR>
+    " Pipe pass filter: show pipe passes for the same chip/slice/pipe
+    nnoremap <silent> <Leader>aP  :exec "EAll" GetFields(2,4," ")<CR>
+    nnoremap <silent> <Leader>aaP :exec "EAllAdd" GetFields(2,4," ")<CR>
     " Address filter: extracts address from current line and shows all events
     " with the same address
-    nnoremap <silent> <Leader>a :call NewAllCmd(GetKey("Adr=")[4:15], "grep")<CR>
+    nnoremap <silent> <Leader>aa  :exec "All" GetKey("Adr=")[4:15]<CR>
+    nnoremap <silent> <Leader>aaa :exec "AllAdd" GetKey("Adr=")[4:15]<CR>
+    " CC Address filter
+    nnoremap <silent> <Leader>ac  :exec "All" GetKey("Adr=")[-6:-1]<CR>
+    nnoremap <silent> <Leader>aac :exec "AllAdd" GetKey("Adr=")[-6:-1]<CR>
+    " Error filter
+    nnoremap <silent> <Leader>ae  :exec "All error"<CR>
+    nnoremap <silent> <Leader>aae :exec "AllAdd error"<CR>
+
+    " Hide (d)data lines
+    nnoremap <silent> <Leader>hd :call HideLines("Data=")<CR>
+    " Hide (p)resp lines
+    nnoremap <silent> <Leader>hp :call HideLines("PRsp=")<CR>
+    " Hide (c)resp lines
+    nnoremap <silent> <Leader>hc :call HideLines("CRsp=")<CR>
+    " Hide (f)dk lines
+    nnoremap <silent> <Leader>hf :call HideLines("\(FRsp\|DRsp\|KRsp\|RRsp\)=")<CR>
+
+    " ------------------------------------------------
+    " Convenient non-standard maps
+    " ------------------------------------------------
+    " Hide all except Pipe Passes
+    nnoremap <silent> <Leader>pp :call ShowLines(" C[34] Md=")<CR>
 endif
+
+
+let s:plugin_path = escape(expand('<sfile>:p:h'), '\')
+exe 'pyfile ' . s:plugin_path . '/all_filter.py'
+
 
 function! GetKey(key)
 python <<PYTHON
@@ -59,6 +91,7 @@ else:
 PYTHON
 endfunction
 
+
 function! GetFields(start, stop, delim)
     " Return fields [start:stop] of the current line, split on *delim*
     let toks = split(getline('.'), a:delim)
@@ -69,6 +102,7 @@ function! GetFields(start, stop, delim)
     endif
     throw "Number of tokens on line less than the range requested"
 endfunction
+
 
 function! GetEverything(search)
 python <<PYTHON
@@ -97,60 +131,24 @@ else:
 PYTHON
 endfunction
 
-function! NewAllCmd(search, grep_cmd)
+
+function! NewAllBuffer(search, grep_cmd, ...)
 python <<PYTHON
-import vim, re, os
-original_row, original_col = vim.current.window.cursor
-search = vim.eval("a:search")
-grep_cmd = vim.eval("a:grep_cmd")
-all_options = vim.eval("g:all_filter_default_grep_opts")
-# check that a buffer with the intended name doesn't already exist
-title = search.replace("|", "\|").replace(r'\b', '')
-title = title.replace("\"", "\\\"").replace(" ", "\ ")
-exists = any(title == b.name.rpartition("/")[2] if b.name else False for b in vim.buffers)
-if exists:
-    vim.command("echo %r" % ("buffer with name %r already exists!" % title))
-else:
-    fname = vim.eval("bufname('')")
-    ftype = vim.eval("&filetype")
-    bnum = vim.current.buffer.number
-    # save current buffer to tempfile
-    tempname = vim.eval("tempname()")
-    vim.command("silent w "+tempname)
-    # create map to jump to the buffer of the last all view
-    vim.command('map <buffer> <C-q> :exec "buffer" g:last_all_buf\|exec "normal j"<cr>')
-    # new unnamed buffer
-    vim.command("enew")
-    # make it a scratch buffer
-    vim.command("set buftype=nofile bufhidden=hide noswapfile")
-    # read grep/grin output into empty buffer
-    vim.command("silent r ! %s -n %s %s %s" %
-                (grep_cmd, all_options, re.escape(search), tempname))
-    # hack to check if any lines found by cursor position
-    row, col = vim.current.window.cursor
-    if (row, col) == (1, 0):
-        vim.command("bd")
-        vim.command("echo %r" % ("Pattern %r not found!" % search))
-    else:
-        vim.command("let g:last_all_buf=%s"%vim.current.buffer.number)
-        # set filetype
-        vim.command("setf "+ftype)
-        # change name of buffer to search pattern
-        vim.command("file "+title)
-        # hack to make buffer show up in minibufexplorer
-        vim.command("new")
-        vim.command("bd")
-        # hack to delete first line (blank)
-        vim.command("normal ggdd")
-        # jump to line in search buffer associated with line the search was
-        # triggered from
-        vim.command("exec search('^%d:')" % original_row)
-        # center the current line
-        vim.command("normal zz")
-        # create map to jump to original buffer
-        vim.command('map <buffer> <C-q> :let @z=GetFields(0,0,":")\|b %s\|exec "normal ".getreg("z")."Gzz"<CR>'%bnum)
-if os.path.isfile(tempname):
-    os.remove(tempname)
+e = vim.eval
+flags = ''
+if int(e("a:0")) > 0:
+    flags = e("a:1")
+add_to_last = 'a' in flags
+new_search_buffer(e("a:search"), e("a:grep_cmd"), add_to_last=add_to_last)
 PYTHON
 endfunction
 
+
+function! HideLines(pattern)
+    exec "g/".a:pattern."/d"
+endfunction
+
+
+function! ShowLines(pattern)
+    exec "g!/".a:pattern."/d"
+endfunction
