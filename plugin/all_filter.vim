@@ -23,11 +23,16 @@ command! -nargs=+ EAllAdd :call NewAllBuffer("<args>", "egrep", 'a')
 
 " Make searches case-insensitive by default (without a way to disable it)
 let g:all_filter_default_grep_opts="-i"
+" Allow short title for GetEverything buffer
+let g:all_filter_everything_short_title=0
 
 "-------------------------------------------------------------------------------
 " Default Mappings
 "-------------------------------------------------------------------------------
 if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_mappings == 1)
+    " Interactive filter
+    nnoremap <silent> <Leader>af  :call NewAllCmd(input("Search for: "), "egrep")<CR>
+    nnoremap <silent> <Leader>aaf :call NewAllCmd(input("Search for: "), "egrep", 'a')<CR>
     " Last search term filter
     nnoremap <silent> <Leader>al  :exec "All" @/<CR>
     nnoremap <silent> <Leader>aal :exec "AllAdd" @/<CR>
@@ -121,7 +126,7 @@ reAdrs = re.compile("|".join(allAdrs), re.IGNORECASE)
 adrMatches = [t for t in trace if reAdrs.search(t) != None]
 # Stick a space on the end of each sequence number
 reSeqNum = re.compile(r"seq=[0-9]+", re.IGNORECASE)
-allSeqs = map(lambda x: x.replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
+allSeqs = map(lambda x: x.lower().replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
 #radness="ERROR|" + "|".join(sorted(set(allSeqs)))
 radness="ERROR|seq=(" + "|".join(sorted(set(allSeqs))) + ")"
 if radness:
