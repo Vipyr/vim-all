@@ -7,12 +7,16 @@ LAST_ALL_BNUM = "b:last_all_bnum"
 ALL_ORIGINAL_BNUM = "b:all_original_bnum"
 
 
-def new_search_buffer(search, grep_cmd, add_to_last=False):
+def new_search_buffer(search, grep_cmd, add_to_last=False, title=None):
     # if run from an All buffer, switch to the original first.
     if var_exists(ALL_ORIGINAL_BNUM):
         vim.command("silent exec 'buffer' %s" % ALL_ORIGINAL_BNUM)
-    # modify title when appending a new search to existing all buffer
-    title = escape_title(search)
+    # create escaped title string
+    if title is None:
+        title = escape_title(search)
+    else:
+        title = escape_title(title)
+    # modify title when appending a new search to an existing all buffer
     if add_to_last:
         bnum = last_all_buffer_num()
         if buffer_num_exists(bnum):
@@ -23,7 +27,7 @@ def new_search_buffer(search, grep_cmd, add_to_last=False):
             add_to_last = False
     # check that a buffer with the intended name doesn't already exist
     if buffer_name_exists(title):
-        echo("buffer with name %r already exists!" % title)
+        throw("buffer with name %r already exists!" % title)
     else:
         # save state from the original buffer:
         #    row, col, filetype and buffer number
@@ -39,7 +43,7 @@ def new_search_buffer(search, grep_cmd, add_to_last=False):
             if not success:
                 if not add_to_last:
                     delete_buffer()
-                echo("Pattern %r not found!" % search)
+                throw("Pattern %r not found!" % search)
             else:
                 sort_buffer()
                 create_ctrl_q_maps(source, bnum)
@@ -55,6 +59,10 @@ def sort_buffer():
 
 def echo(msg):
     vim.command("echo %r" % msg)
+
+
+def throw(msg):
+    vim.command("throw %r" % msg)
 
 
 def escape_title(search):
@@ -166,4 +174,24 @@ def save_buffer_to_file(fname):
 def delete_buffer(bnum=''):
     vim.command("bd "+bnum)
 
+
+def get_everything_re(search):
+    trace = vim.current.buffer[:]
+    # Find all lines containing search string
+    seq = [t for t in trace if t.find(search) > 0]
+    # Find all addresses used by seqNum
+    allAdrs = [a[4:15] for a in " ".join(seq).split() if a.startswith("Adr=")]
+    allAdrs = sorted(set(map(lambda x: x.strip(), allAdrs)))
+    # Find all the sequences operating on all addresses in adr
+    reAdrs = re.compile("|".join(allAdrs), re.IGNORECASE)
+    adrMatches = [t for t in trace if reAdrs.search(t) != None]
+    # Stick a space on the end of each sequence number
+    reSeqNum = re.compile(r"seq=[0-9]+", re.IGNORECASE)
+    allSeqs = map(lambda x: x.lower().replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
+    #radness="ERROR|" + "|".join(sorted(set(allSeqs)))
+    radness="ERROR|seq=(" + "|".join(sorted(set(allSeqs))) + ")"
+    if radness:
+        return radness
+    else:
+        throw('Something.Awful.Just.Happened.In.GetEverything')
 

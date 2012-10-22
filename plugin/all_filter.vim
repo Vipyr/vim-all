@@ -5,26 +5,28 @@
 "     g:use_default_all_filter_mappings = 1 or 0
 "
 
+
 if !has('python')
     " exit if python is not available.
     finish
 endif
 
+
 if exists("b:did_all_filter_plugin")
     finish " only load once
 endif
-
 let b:did_all_filter_plugin = 1
+
 
 command! -nargs=+ All    :call NewAllBuffer("<args>", "grep")
 command! -nargs=+ AllAdd :call NewAllBuffer("<args>", "grep", 'a')
 command! -nargs=+ EAll    :call NewAllBuffer("<args>", "egrep")
 command! -nargs=+ EAllAdd :call NewAllBuffer("<args>", "egrep", 'a')
 
+
 " Make searches case-insensitive by default (without a way to disable it)
 let g:all_filter_default_grep_opts="-i"
-" Allow short title for GetEverything buffer
-let g:all_filter_everything_short_title=0
+
 
 "-------------------------------------------------------------------------------
 " Default Mappings
@@ -42,8 +44,8 @@ if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_map
     nnoremap <silent> <Leader>aas :exec "EAllAdd" GetKey("seq=")."\\\\b"<CR>
     " Super filter: extracts address from current line and shows all sequences
     " operating on the same address, plus any errors
-    nnoremap <silent> <Leader>aS  :exec "EAll" GetEverything(GetKey("seq="))<CR>
-    nnoremap <silent> <Leader>aaS :exec "EAllAdd" GetEverything(GetKey("seq="))<CR>
+    nnoremap <silent> <Leader>aS  :call GetEverything(GetKey("seq="))<CR>
+    nnoremap <silent> <Leader>aaS :call GetEverything(GetKey("seq="), 'a')<CR>
     " Parent sequence filter: extract parent sequence from current line, then
     " show all parent and child events
     nnoremap <silent> <Leader>ap  :exec "EAll" GetKey("Pseq=")[1:]."\\\\b"<CR>
@@ -109,30 +111,17 @@ function! GetFields(start, stop, delim)
 endfunction
 
 
-function! GetEverything(search)
+function! GetEverything(search, ...)
 python <<PYTHON
-import vim
-import re
-import sys
-search = vim.eval("a:search")
-trace = vim.current.buffer[:]
-# Find all lines containing search string
-seq = [t for t in trace if t.find(search) > 0]
-# Find all addresses used by seqNum
-allAdrs = [a[4:15] for a in " ".join(seq).split() if a.startswith("Adr=")]
-allAdrs = sorted(set(map(lambda x: x.strip(), allAdrs)))
-# Find all the sequences operating on all addresses in adr
-reAdrs = re.compile("|".join(allAdrs), re.IGNORECASE)
-adrMatches = [t for t in trace if reAdrs.search(t) != None]
-# Stick a space on the end of each sequence number
-reSeqNum = re.compile(r"seq=[0-9]+", re.IGNORECASE)
-allSeqs = map(lambda x: x.lower().replace("seq=","")+r"\b", reSeqNum.findall(r"\b".join(adrMatches)))
-#radness="ERROR|" + "|".join(sorted(set(allSeqs)))
-radness="ERROR|seq=(" + "|".join(sorted(set(allSeqs))) + ")"
-if radness:
-  vim.command("return '%s'"%radness)
-else:
-  vim.command("return 'Something.Awful.Just.Happened.In.GetEverything'")
+e = vim.eval
+flags = ''
+if int(e("a:0")) > 0:
+    flags = e("a:1")
+add_to_last = 'a' in flags
+search = e("a:search")
+everything = get_everything_re(search)
+title = "Everything:%s" % search
+new_search_buffer(everything, "egrep", add_to_last=add_to_last, title=title)
 PYTHON
 endfunction
 
