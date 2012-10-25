@@ -24,8 +24,17 @@ command! -nargs=+ EAll    :call NewAllBuffer("<args>", "egrep")
 command! -nargs=+ EAllAdd :call NewAllBuffer("<args>", "egrep", 'a')
 
 
-" Make searches case-insensitive by default (without a way to disable it)
-let g:all_filter_default_grep_opts="-i"
+" Default grep options:
+"    -i = Perform case-insensitive searches
+"    -a = force files to be treated as ASCII (to workaround malformed trace
+"    files that look like binary format to grep).
+let g:all_filter_default_grep_opts="-ia"
+
+
+let os = substitute(system('uname'), "\n", "", "")
+if os == "AIX"
+    let g:all_filter_grep_path="/opt/xsite/contrib/bin/"
+endif
 
 
 "-------------------------------------------------------------------------------
@@ -55,8 +64,8 @@ if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_map
     nnoremap <silent> <Leader>aaP :exec "EAllAdd" GetFields(2,4," ")<CR>
     " Address filter: extracts address from current line and shows all events
     " with the same address
-    nnoremap <silent> <Leader>aa  :exec "All" GetKey("Adr=")[4:15]<CR>
-    nnoremap <silent> <Leader>aaa :exec "AllAdd" GetKey("Adr=")[4:15]<CR>
+    nnoremap <silent> <Leader>aa  :exec "All" GetKey("Adr=")[4:14]<CR>
+    nnoremap <silent> <Leader>aaa :exec "AllAdd" GetKey("Adr=")[4:14]<CR>
     " CC Address filter
     nnoremap <silent> <Leader>ac  :exec "All" GetKey("Adr=")[-6:-1]<CR>
     nnoremap <silent> <Leader>aac :exec "AllAdd" GetKey("Adr=")[-6:-1]<CR>
