@@ -8,9 +8,12 @@ ALL_ORIGINAL_BNUM = "b:all_original_bnum"
 
 
 def new_search_buffer(search, grep_cmd, add_to_last=False, title=None):
-    # if run from an All buffer, switch to the original first.
+    # if run from an All buffer, switch to the original first and override
+    # "last" all buffer variable
     if var_exists(ALL_ORIGINAL_BNUM):
+        bnum = vim.current.buffer.number
         vim.command("silent exec 'buffer' %s" % ALL_ORIGINAL_BNUM)
+        vim.command("let %s=%d" % (LAST_ALL_BNUM, bnum))
     # create escaped title string
     if title is None:
         title = escape_title(search)
@@ -27,7 +30,7 @@ def new_search_buffer(search, grep_cmd, add_to_last=False, title=None):
             add_to_last = False
     # check that a buffer with the intended name doesn't already exist
     if buffer_name_exists(title):
-        throw("buffer with name %r already exists!" % title)
+        echo("buffer with name %r already exists!" % title)
     else:
         # save state from the original buffer:
         #    row, col, filetype and buffer number
@@ -43,7 +46,7 @@ def new_search_buffer(search, grep_cmd, add_to_last=False, title=None):
             if not success:
                 if not add_to_last:
                     delete_buffer()
-                throw("Pattern %r not found!" % search)
+                echo("Pattern %r not found!" % search)
             else:
                 sort_buffer()
                 create_ctrl_q_maps(source, bnum)
@@ -78,9 +81,12 @@ def grep_opts():
 def read_search_output(grep_cmd, search, fname):
     """Reads search output into current buffer.  Returns False if search
     contained no lines."""
+    path = ""
+    if var_exists("g:all_filter_grep_path"):
+        path = vim.eval("g:all_filter_grep_path")
     # read grep/grin output into empty buffer
-    vim.command("silent r ! %s -n %s %s %s" %
-                (grep_cmd, grep_opts(), re.escape(search), fname))
+    vim.command("silent r ! %s%s -n %s %s %s" %
+                (path, grep_cmd, grep_opts(), re.escape(search), fname))
     # hack to check if any lines found by cursor position
     row, col = vim.current.window.cursor
     return (row, col) != (1, 0)
