@@ -24,8 +24,17 @@ command! -nargs=+ EAll    :call NewAllBuffer("<args>", "egrep")
 command! -nargs=+ EAllAdd :call NewAllBuffer("<args>", "egrep", 'a')
 
 
-" Make searches case-insensitive by default (without a way to disable it)
-let g:all_filter_default_grep_opts="-i"
+" Default grep options:
+"    -i = Perform case-insensitive searches
+"    -a = force files to be treated as ASCII (to workaround malformed trace
+"    files that look like binary format to grep).
+let g:all_filter_default_grep_opts="-ia"
+
+
+let os = substitute(system('uname'), "\n", "", "")
+if os == "AIX"
+    let g:all_filter_grep_path="/opt/xsite/contrib/bin/"
+endif
 
 
 "-------------------------------------------------------------------------------
