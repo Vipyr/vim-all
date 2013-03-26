@@ -123,7 +123,8 @@ def get_current_state():
 
 def restore_state(state, delete_first_line=True):
     # set filetype
-    vim.command("setf "+state['ftype'])
+    if state['ftype'] != "": 
+        vim.command("setf "+state['ftype'])
     if delete_first_line:
         # hack to delete first line (blank)
         vim.command("normal ggdd")
