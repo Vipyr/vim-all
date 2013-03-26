@@ -55,8 +55,8 @@ if !exists('g:use_default_all_filter_mappings') || (g:use_default_all_filter_map
     nnoremap <silent> <Leader>aaP :exec "EAllAdd" GetFields(2,4," ")<CR>
     " Address filter: extracts address from current line and shows all events
     " with the same address
-    nnoremap <silent> <Leader>aa  :exec "All" GetKey("Adr=")[4:15]<CR>
-    nnoremap <silent> <Leader>aaa :exec "AllAdd" GetKey("Adr=")[4:15]<CR>
+    nnoremap <silent> <Leader>aa  :exec "All" GetKey("Adr=")[4:14]<CR>
+    nnoremap <silent> <Leader>aaa :exec "AllAdd" GetKey("Adr=")[4:14]<CR>
     " CC Address filter
     nnoremap <silent> <Leader>ac  :exec "All" GetKey("Adr=")[-6:-1]<CR>
     nnoremap <silent> <Leader>aac :exec "AllAdd" GetKey("Adr=")[-6:-1]<CR>
