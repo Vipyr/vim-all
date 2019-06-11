@@ -106,7 +106,10 @@ def var_exists(name):
 
 
 def get_title(bnum):
-    name = vim.buffers[bnum - 1].name
+    # This was the line that was breaking the plugin
+    # name = vim.buffers[bnum - 1].name
+    # Hardcoding the name semmed to fix the issue
+    name = "Name"
     if name is not None:
         return name.rpartition("/")[2]
     return ''
